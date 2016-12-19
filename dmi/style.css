@@ -31,19 +31,24 @@ p + p {
 h1 {
   font-size: 2em;
   font-weight: bold;
-  align: center;
+  text-align: center;
   color: #0c219e;
-  line-height: 1; }
+  margin-bottom: 1.4em;
+  margin-top: 0; }
 
 h2 {
   font-size: 1.2em;
   font-weight: bold;
-  color: #0c219e; }
+  color: #0c219e;
+  margin-bottom: 1.4em;
+  margin-top: 1.9em; }
 
 h3 {
   font-size: 1.2em;
   font-weight: normal;
-  color: #0c219e; }
+  color: #0c219e;
+  margin-bottom: 1.4em;
+  margin-top: 1.9em; }
 
 blockquote {
   margin-left: 1.5em;
@@ -56,6 +61,7 @@ table {
   border: none;
   border-spacing: 0; }
 
+th,
 td {
   padding: 0.5em;
   margin: 0; }
@@ -91,6 +97,12 @@ div.box {
   margin: auto;
   background-color: #f0f0f0;
   border: 1px solid #e5e6f0; }
+
+div.textpage {
+  padding: 1em;
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+  max-width: 52em; }
 
 button {
   border: 1px solid #a6a9cf;
