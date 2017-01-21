@@ -14941,7 +14941,7 @@ case 5:return P.U(null,0,y)
 case 1:return P.U(w,1,y)}})
 return P.U(null,$async$fq,y)},
 qm:function(a){var z,y,x
-z=P.a2("://github\\.com/(\\w+)/(\\w+)/raw/(\\w+)/([^#?\\s]+)",!0,!1).be(a)
+z=P.a2("://github\\.com/([A-Za-z0-9\\-]+)/([A-Za-z0-9\\-]+)/raw/(\\w+)/([^#?\\s]+)",!0,!1).be(a)
 if(z!=null){y=z.b
 if(1>=y.length)return H.a(y,1)
 x=C.c.i("https://raw.githubusercontent.com/",y[1])+"/"
