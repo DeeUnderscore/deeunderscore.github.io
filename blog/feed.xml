@@ -2,13 +2,104 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">deeunderscore.github.io</title>
   <id>urn:uuid:f9771c22-e191-3278-92c2-4cf9443c01d8</id>
-  <updated>2018-03-21T18:44:40+00:00</updated>
+  <updated>2018-05-18T16:44:44+00:00</updated>
   <link href="https://deeunderscore.github.io/blog/" />
   <link href="https://deeunderscore.github.io/blog/feed.xml" rel="self" />
   <author>
     <name>D Anzorge</name>
   </author>
   <generator uri="https://github.com/ajdavis/lektor-atom" version="0.2">Lektor Atom Plugin</generator>
+  <entry xml:base="https://deeunderscore.github.io/blog/keeping-things-in-perkeep.html">
+    <title type="text">Keeping things in Perkeep</title>
+    <id>urn:uuid:8f9f5d6a-dcb1-3cff-baac-f23066e0c832</id>
+    <updated>2018-05-18T16:44:44+00:00</updated>
+    <link href="https://deeunderscore.github.io/blog/keeping-things-in-perkeep.html" />
+    <author>
+      <name>D Anzorge</name>
+    </author>
+    <content type="html">&lt;p&gt;&lt;a href=&quot;https://perkeep.org/&quot;&gt;&lt;strong&gt;Perkeep&lt;/strong&gt;&lt;/a&gt; (previously called Camlistore) introduces itself as &quot;a set of open source formats, protocols, and software for modeling, storing, searching, sharing and synchronizing data in the post-PC era&quot;. Less vaguely, the purpose of Perkeep is chiefly to archive an individual's data, which can include both traditional files, as well as data that is not exactly files, like online posts.&lt;/p&gt;
+&lt;p&gt;The Perkeep daemon comes with a bunch of tools and importers, but it does also expose HTTP APIs which can be used to interact with the storage system from outside. Since I use &lt;a href=&quot;https://joinmastodon.org/&quot;&gt;Mastodon&lt;/a&gt;, I wanted to stick the contents of a Mastodon user data dump into Perkeep, using those APIs.&lt;/p&gt;
+&lt;p&gt;This is an overview of how one would go about it. If you would like the concrete tool itself, check out &lt;a href=&quot;https://github.com/DeeUnderscore/ap-perkeep-uploader&quot;&gt;&lt;strong&gt;ap-perkeep-uploader&lt;/strong&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Keeping permanently&lt;/h2&gt;
+&lt;p&gt;In order to figure out how to stick our stuff in Perkeep, we need to figure out how Perkeep actually works. It starts with blobs.
+[% figure_box image=&quot;_keeping-things-in-perkeep.html/keepy.png&quot; thumb=&quot;_keeping-things-in-perkeep.html/keepy-smallish.png&quot; alt=&quot;A colorful, cartoonish bird&quot; caption='This is &lt;a href=&quot;https://perkeep.org/keepy&quot;&gt;Keepy&lt;/a&gt;, the Perkeep parakeet. It is not an oddly-colored chicken, as I initially thought.' %]&lt;/p&gt;
+&lt;h3&gt;Blobs&lt;/h3&gt;
+&lt;p&gt;On the lowest level, Perkeep is a &lt;strong&gt;content-addressable storage&lt;/strong&gt; system. There are several storage backends for the content-addressed blobs of immutable data, including several ways of storing them on a local disk (packed together or in separate files), as well as backends that upload blobs to cloud storage. Perkeep receives your data blob, hashes it, and then stores it under that hash (called &lt;strong&gt;blobref&lt;/strong&gt;). You can subsequently get it back by providing the hash. All other functionality is built on top of this base.&lt;/p&gt;
+&lt;h3&gt;Special blobs&lt;/h3&gt;
+&lt;p&gt;Metadata for all those blobs floating around in the blobstore is provided in the shape of so-called &lt;strong&gt;schema blobs&lt;/strong&gt;—blobs which contain plain text JSON objects with some specific fields. The Perkeep daemon comes with an indexer, which goes through all the blobs that go into the store, figures out which ones are relevant, and saves the data in its database. The index database is redundant with the data stored in blobs and can be recreated at any time.&lt;/p&gt;
+&lt;p&gt;Using that index, Perkeep can provide a higher-level interface to the data put in it. Files, for example, are often stored over several blobs, and a file metadata blob tells us what blobs we need to fetch, and in what order to concatenate them together to get the original file back. The indexer will store that metadata, and if we ask it, it will fetch the file and glue it back together.&lt;/p&gt;
+&lt;p&gt;Structured data is not limited to file metadata only, though—Perkeep can store arbitrary key-value pairs through permanodes. &lt;strong&gt;Permanodes&lt;/strong&gt; and &lt;strong&gt;claims&lt;/strong&gt; are Perkeep's answer to the problem of storing mutable data in an append-only data store. A permanode is essentially an anchor—its chief purpose is to provide an address in the form of its hash.&lt;/p&gt;
+&lt;p&gt;Claims, on the other hand, are basically transactions: they are schema blobs which reference a permanode and say things like &quot;set the field &lt;code&gt;foo&lt;/code&gt; to value &lt;code&gt;bar&lt;/code&gt;&quot; or &quot;delete field &lt;code&gt;foo&lt;/code&gt;&quot;. The Perkeep indexer can then collect all the claims which reference a particular permanode, replay them in sequence, and figure out what attributes (key-value pairs) the permanode has. Of course, the permanode blob itself has not been changed—the indexer just created a virtual view of the permanode and its attributes.&lt;/p&gt;
+&lt;p&gt;Note that permanodes and claims are &lt;a href=&quot;https://perkeep.org/doc/json-signing/&quot;&gt;cryptographically signed&lt;/a&gt;. There is an API endpoint for doing the signing, but signing can also be done locally, by following the algorithm.&lt;/p&gt;
+&lt;h2&gt;Scheming&lt;/h2&gt;
+&lt;p&gt;Internal Perkeep importers generally work by creating a permanode for each item imported, and using the permanode's attributes to store the item's data. In practical terms, this means that something like the Twitter importer creates a permanode for every tweet, and the Atom/RSS importer creates a permanode for every feed item.&lt;/p&gt;
+&lt;p&gt;At this point, we might want to glance at our ActivityStreams data, to figure out what we want to grab out of it. Here is a very simple example of one ActivityStreams activity:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;id&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://example.com/Alice/activities/1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;type&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;Create&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;actor&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://example.com/Alice&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;published&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;2010-01-01T00:10:00Z&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;to&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;
+        &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://www.w3.org/ns/activitystreams#Public&amp;quot;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;],&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;object&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nt&quot;&gt;&amp;quot;id&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://example.com/Alice/notes/1&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+        &lt;span class=&quot;nt&quot;&gt;&amp;quot;type&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;Note&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+        &lt;span class=&quot;nt&quot;&gt;&amp;quot;content&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;Hello, world!&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+        &lt;span class=&quot;nt&quot;&gt;&amp;quot;to&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;
+            &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://www.w3.org/ns/activitystreams#Public&amp;quot;&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Without getting too deep into how ActivityStreams/&lt;a href=&quot;https://activitypub.rocks/&quot;&gt;ActivityPub&lt;/a&gt; works (a question that is otherwise interesting, if you wanted to build your own fediverse thing), we can see that we have an activity, as well as the object of that activity.&lt;/p&gt;
+&lt;p&gt;So, to start, we make a permanode. This takes no data from our dump, just an arbitrary random string, and some signing data (faked here, longer in practice):&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliVersion&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliType&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;permanode&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; 
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;random&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;IAmReallyRandom&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSigner&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;sha224-aaabbbcccddd&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSig&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;bm90aGluZyB0byBzZWUgaGVyZQo=&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;When we push the above permanode, it should be stored under the blobref &lt;code&gt;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&lt;/code&gt;. We can then push some claim blobs to create attributes on that permanode:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliVersion&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliType&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;claim&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSigner&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;sha224-aaabbbcccddd&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;claimDate&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;2018-05-15T10:20:30Z&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;permaNode&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;       
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;claimType&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;set-attribute&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;attribute&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;activityId&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;https://example.com/Alice/activities/1&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSig&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;8J+kt/CfpLfwn6S3Cg==&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As you can see, we are &lt;code&gt;set&lt;/code&gt;ting the attribute called &lt;code&gt;activityId&lt;/code&gt; to the value &lt;code&gt;https://example.com/Alice/activities/1&lt;/code&gt;. Note that we had to provide a date, since the indexer will replay the claims sequentially, and so needs to know which comes before which. We also have the permanode blobref, an attribute, an action (&lt;code&gt;set-attribute&lt;/code&gt; here, but we could also do a &lt;code&gt;del-attribute&lt;/code&gt;, for example), and a value.&lt;/p&gt;
+&lt;p&gt;We now have two new blobs in the blobstore: one for the permanode, and one for the claim. The permanode blob remained the same as it was when we first put it there. However, the indexer will now see that the permanode &lt;code&gt;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&lt;/code&gt; has an attribute &lt;code&gt;activityId&lt;/code&gt;, and make it available for searching by that attribute. This ID is a useful thing to search by, since per ActivityPub it will be a globally unique identifier for this particular activity.&lt;/p&gt;
+&lt;p&gt;We will need a claim for every attribute we want to set:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliVersion&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliType&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;claim&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSigner&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;sha224-aaabbbcccddd&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;claimDate&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;2018-05-15T10:20:40Z&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;permaNode&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;       
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;claimType&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;set-attribute&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;attribute&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;content&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;quot;value&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;Hello, world!&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;quot;camliSig&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;c3RpbGwgbm90aGluZyB0byBzZWUK&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;...and so on, until we've slurped everything we wanted to slurp.&lt;/p&gt;
+&lt;p&gt;For more complicated data, we can have attributes with values that are blobrefs of further data—either more permanodes, or things like file nodes. This allows creating a tree of permanodes, but also allows for representing things like image attachments by referencing a file schema blob.&lt;/p&gt;
+&lt;h2&gt;Caveats&lt;/h2&gt;
+&lt;h3&gt;Data modeling is tricky business&lt;/h3&gt;
+&lt;p&gt;Of course, when saving your data for all eternity, it is somewhat important that you pick a suitable schema. With the ActivityStreams example, you &lt;em&gt;could&lt;/em&gt; decide that you only want minimal metadata in the permanode, and that you are happy saving the rest as JSON in a separate file (that the indexer will not understand). On the other end of the spectrum, you may want to serialize the &lt;em&gt;entire&lt;/em&gt; thing into a set of Perkeep permanodes, possibly slowing things down and increasing on-disk size, but at the same time making everything very friendly to the Perkeep indexer.&lt;/p&gt;
+&lt;p&gt;This becomes more evident when we deal with things like ActivityStreams with their JSON-LD, which is meant to facilitate interlinking of structured data.  Of course, Perkeep is generally oriented more towards storing of personal archives instead of exchanging and linking data with others, so the schema has different requirements&lt;/p&gt;
+&lt;h3&gt;Showing data&lt;/h3&gt;
+&lt;figure class=&quot;figbox&quot;&gt;&lt;a href=&quot;_keeping-things-in-perkeep.html/foldersforever.png&quot;&gt;&lt;img src=&quot;_keeping-things-in-perkeep.html/foldersforever-smallish.png&quot; alt=&quot;Perkeep web UI, showing a bunch of unlabeled folders.&quot;&gt;&lt;/a&gt;&lt;figcaption&gt;The web UI has no idea what these are.&lt;/figcaption&gt;&lt;/figure&gt;&lt;p&gt;While we can shove all we want into Perkeep in the ways described above, the highest level parts of Perkeep will likely not understand our data. We can use standardized attributes for things like geolocation and time, which the indexer will understand. We can also issue specific search queries, based on fields we know our data has. However, the Perkeep web UI, only knows about the schema which the Perkeep importers use, and is not easily extensible.&lt;/p&gt;
+&lt;p&gt;This is probably the major incentive for actually hacking on Perkeep proper, instead of creating solution which interact with it via the API. One has to dive into Perkeep's guts anyway, if one wants to their data presented fancily.&lt;/p&gt;
+&lt;h2&gt;Forever is a long time&lt;/h2&gt;
+&lt;p&gt;Personally, I have not been using Perkeep for a long time. This is unlike some of its developers, who have been using it for years. Nevertheless, it cannot hurt to use something designed to slurp and archive things that usually remain otherwise unslurepd and unarchived. And, should Perkeep turn out to be terrible in some way down the line, blob storage model is sufficiently simple to make migrating data out of it not seem like too daunting of a problem.&lt;/p&gt;
+</content>
+  </entry>
   <entry xml:base="https://deeunderscore.github.io/blog/adventures-in-generating-static-sites.html">
     <title type="text">Adventures in generating static sites</title>
     <id>urn:uuid:a4f8427e-8908-33f2-a10a-7c7e86143580</id>
