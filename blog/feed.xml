@@ -2,13 +2,86 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">deeunderscore.github.io</title>
   <id>urn:uuid:f9771c22-e191-3278-92c2-4cf9443c01d8</id>
-  <updated>2018-05-18T16:44:44+00:00</updated>
+  <updated>2018-09-19T15:08:00+00:00</updated>
   <link href="https://deeunderscore.github.io/blog/" />
   <link href="https://deeunderscore.github.io/blog/feed.xml" rel="self" />
   <author>
     <name>D Anzorge</name>
   </author>
   <generator uri="https://github.com/ajdavis/lektor-atom" version="0.2">Lektor Atom Plugin</generator>
+  <entry xml:base="https://deeunderscore.github.io/blog/collab-graphs.html">
+    <title type="text">Collaboration graphs and Git</title>
+    <id>urn:uuid:79d5601d-d9aa-3a15-83c7-11fcd5d3c83c</id>
+    <updated>2018-09-19T15:08:00+00:00</updated>
+    <link href="https://deeunderscore.github.io/blog/collab-graphs.html" />
+    <author>
+      <name>D Anzorge</name>
+    </author>
+    <content type="html">&lt;p&gt;A &lt;a href=&quot;https://en.wikipedia.org/wiki/Collaboration_graph&quot;&gt;collaboration graph&lt;/a&gt;, as the name indicates, is a graph of people who have collaborated on projects of some kind. The vertices are individuals, and they are linked by an edge if they have worked together on the same project.&lt;/p&gt;
+&lt;p&gt;A popular application of collaboration graphs is calculating somebody's &lt;a href=&quot;https://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon#Bacon_numbers&quot;&gt;Bacon number&lt;/a&gt; or &lt;a href=&quot;https://en.wikipedia.org/wiki/Erd%C5%91s_number&quot;&gt;Erdős number&lt;/a&gt;. In case of the Bacon number, the collaboration graph links actors who have been in a movie together. The number is equal to the number of edges between Kevin Bacon and a given actor. An actor who was in a movie with Kevin Bacon has a Bacon number of 1. An actor with the Bacon number of 2 is someone who was not in any movies with Kevin Bacon, but was in a movie with someone else, who in turn &lt;em&gt;was&lt;/em&gt; in a movie with Bacon. The Erdős number is the same concept, except instead of movies, people are linked by co-authorship of academic papers.&lt;/p&gt;
+&lt;p&gt;I have a lot of FOSS project Git repositories cloned on my computer. Some of them I have contributed to, but I also clone stuff to compile locally, or even to check out the source code. It occurred to me that using those repositories, I can build a small collaboration graph of FOSS contributors. This should not be too hard, since both libraries for pulling information out of Git repositories and libraries for building and analyzing graphs are readily available.&lt;/p&gt;
+&lt;h2&gt;Histories of Git&lt;/h2&gt;
+&lt;p&gt;When you set up Git on your computer you will (hopefully) input two things: your name, and your email address (&lt;code&gt;user.name&lt;/code&gt; and &lt;code&gt;user.email&lt;/code&gt;, respectively). Git adds these to every commit you make. Because of this, if you have a Git repository that was not cloned shallowly (that is, you have all the commits available locally), then you can find a list of all people who have contributed to it.&lt;/p&gt;
+&lt;p&gt;Git is popular, so of course there is a library available for interacting with it from Python: the aptly-named &lt;a href=&quot;https://github.com/gitpython-developers/GitPython&quot;&gt;GitPython&lt;/a&gt; library. It makes it fairly easy to process Git commit histories:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kn&quot;&gt;from&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;git&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Repo&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;contributors&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;set&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;repo&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Repo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&amp;#39;/path/to/repo&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;commits&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;repo&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;iter_commits&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;commit&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;commits&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;contributors&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;add&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;commit&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;author&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;With some parallelization to make things faster, we can process all the git directories we are interested in, and either load the data directly into a graph object, or perhaps save it in an SQLite database for easier loading later.&lt;/p&gt;
+&lt;p&gt;Of course, it should be noted that a person can contribute under several name-email pairs. Sites like Github will generally identify people by their email address, and that is a relatively easy option. It is certainly possible that someone would have the same name and several different addresses under which they contributed, but that gets into more complicated territory, with possible false positives when trying to merge contributors.&lt;/p&gt;
+&lt;h2&gt;Making a graph&lt;/h2&gt;
+&lt;p&gt;After obtaining a set of contributors for a given project, we will want to add that information to a graph. Two most popular graph libraries for Python seem to be &lt;a href=&quot;https://graph-tool.skewed.de/&quot;&gt;graph-tool&lt;/a&gt; and &lt;a href=&quot;https://networkx.github.io/&quot;&gt;NetworkX&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;graph-tool focuses on performance—it uses C or C++ parts for handling the more computationally demanding tasks. NetworkX, on the other hand, is somewhat more flexible. Attaching metadata to edges or vertices is easier in NetworkX than in graph-tool, but drawing a good-looking graph with a lot of edges is faster if you use graph-tool, rather than NetworkX's matplotlib graphing capabilities. Both libraries are capable of dumping and loading graphs to and from a number of formats, so it is not very difficult to switch from one to the other.&lt;/p&gt;
+&lt;p&gt;NetworkX is slightly easier to use in this case. Since it can use any hashable Python object as a vertex, we can use project paths and contributor emails to identify our vertices. Adding a vertex is idempotent—if we try to add the same object twice, we only end up with one vertex.&lt;/p&gt;
+&lt;p&gt;Having obtained a set of contributors for each project earlier on, we can now easily create a graph, whether we are running a database query or just directly using the sets we assembled earlier.&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Graph&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;# pairs contains tuples of project path and contributor email, such&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;# as (&amp;#39;/path/to/repo&amp;#39;, &amp;#39;alice@example.com&amp;#39;)&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;project&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;contributor&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pairs&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;add_node&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;project&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&amp;#39;project&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;add_node&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;contributor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&amp;#39;contributor&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;add_edge&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;project&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;contributor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Note that both projects and contributors are vertices (which NetworkX calls &lt;i&gt;nodes&lt;/i&gt;). We include extra metadata in the form of the &lt;code&gt;kind&lt;/code&gt; field.&lt;/p&gt;
+&lt;h2&gt;Finding paths&lt;/h2&gt;
+&lt;p&gt;If we want to find a path between two vertices, NetworkX offers us an aptly named function: &lt;code&gt;shortest_path()&lt;/code&gt;. Let's say we want to find the path between &lt;code&gt;alice@example.com&lt;/code&gt; and &lt;code&gt;bob@example.com&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;shortest_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;alice@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;bob@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Provided there actually is a path between the two nodes, we will get something like this:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&amp;#39;alice@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+ &lt;span class=&quot;s1&quot;&gt;&amp;#39;/some/project&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+ &lt;span class=&quot;s1&quot;&gt;&amp;#39;carol@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+ &lt;span class=&quot;s1&quot;&gt;&amp;#39;/another/project&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+ &lt;span class=&quot;s1&quot;&gt;&amp;#39;bob@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As a human, you can tell that Bob is two hops away from Alice. Of course, you can also programmatically filter the resulting path to only show contributors:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;shortest_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;g&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;alice@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;bob@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get_node_attributes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;kind&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;s1&quot;&gt;&amp;#39; — &amp;#39;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;join&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;filter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;lambda&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;contributor&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;This will give you a string like this:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;&amp;#39;alice@example.com — carol@example.com — bob@example.com&amp;#39;&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;On the other hand, you can also filter for the projects which connect the contributors. If you count these, you will get the degree of separation:&lt;/p&gt;
+&lt;div class=&quot;hll&quot;&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;path&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;shortest_path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;g&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;alice@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;bob@example.com&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;networkx&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get_node_attributes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;graph&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;kind&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;nb&quot;&gt;sum&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;path&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&amp;#39;project&amp;#39;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Conclusions&lt;/h2&gt;
+&lt;p&gt;After all this, I found out my Linus Torvalds Number is two—I have contributed to a project that someone who has contributed to Git also contributed to. Of course, there is more stuff you can do with with collaboration graphs like these—for an obvious example, you can draw them. The available Python libraries make it fairly easy to get started.&lt;/p&gt;
+</content>
+  </entry>
   <entry xml:base="https://deeunderscore.github.io/blog/keeping-things-in-perkeep.html">
     <title type="text">Keeping things in Perkeep</title>
     <id>urn:uuid:8f9f5d6a-dcb1-3cff-baac-f23066e0c832</id>
