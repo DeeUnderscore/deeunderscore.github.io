@@ -2,76 +2,16 @@
 <html lang="en-US">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../static/main.css?h=a1cf09c1">
-  <link rel="stylesheet" href="../static/pygments.css">
-  <title>Tiling isometric tiles — deeunderscore.github.io</title>
-  <link rel="alternate" type="application/atom+xml" title="Blog" href="../blog/feed.xml">
+  <title>Tiling isometric tiles — moved to dee.underscore.world</title>
+  <meta http-equiv="refresh" content="5; url=https://dee.underscore.world/blog/isometric-tiles.html">
 </head>
 <body>
 <div id="wrapper">
-  <header id="banner">
-      <h1><a href="/">dee&#8203;underscore&#8203;.github&#8203;.io</a></h1>
-  </header>
-    <nav id="menu"><ul>
-        
-          <li><a href="../">Home</a></li>
-        
-          <li><a href="../blog/">Blog</a></li>
-        
-          <li><a href="../about/">About</a></li>
-        
-          <li><a href="../dmi">DMI viewer</a></li>
-        
-    </ul></nav>
-    <div id="movednotice"><h2>Notice</h2><p>This website has moved to <a href="https://dee.underscore.world" rel="me">dee.underscore.world</a>. This version remains here as an archive.</p></div>
   <main>
     
-  <article class="content fullarticle h-entry">
-    <header>
-      <h1 class="p-name">Tiling isometric tiles</h1>
-      <div class="metamatter"><time class="dt-published" datetime="2019-01-11T18:50:00+00:00"> 11 January 2019, 18:50</time></div>
-    </header>
-    <div class="e-content"><p>I recently wrote a library in Rust which generates a random terrain consisting of blocks (think Minecraft or Minetest), and renders it in isometric perspective. It's called <cite>cubeglobe</cite>, and <a href="https://github.com/DeeUnderscore/cubeglobe">its source is available on Github</a>. The library was written to be used by <a href="https://github.com/DeeUnderscore/cubeglobe-bot">a Fediverse bot</a>, which posts these randomly generated landscapes on a relatively regular basis. You can check out <a href="https://beeping.town/users/cubeglobe">the bot's feed</a> if you want some examples of what this looks like.</p>
-<p>In the process of writing <cite>cubeglobe</cite>, I had to figure out how to actually render these images, given an internal representation of the landscape, and a handful of tile sprites corresponding to the different block types that the internal representation can feature. This is not a very unique problem—representing various sorts of maps using isometric tiles is something that video games have been doing for decades. In fact, my problem was somewhat easier, since I did not have to worry about interactivity, while video games generally do. Nevertheless, I did have to figure out how to do it, and these notes detail that.</p>
-<h2>The 2:1 diametric projection</h2>
-<p>A common way of doing isometric graphics on a computer, especially when you're doing something on the more pixel art end of the spectrum, is to use the 2:1 pixel ratio. This is technically not an isometric projection, but a diametric one (you can read more about it in <a href="https://en.wikipedia.org/wiki/Isometric_video_game_graphics">an otherwise interesting Wikipedia article</a>). This projection has the benefit of making it easy to draw lines—they go one pixel up, two pixels laterally, hence the 2:1 ratio. <a href="#figure-1">Figure 1</a> illustrates what this looks like.</p>
-<figure id="figure-1" class="figwide"><a href="_isometric-tiles.html/2-1.png"><img src="_isometric-tiles.html/2-1.png" alt="A simple drawing showing the principal axes in a 2:1 perspective"></a><figcaption>Figure 1: The axes in a 2:1 projection</figcaption></figure><p>The figure also marks the axes in the world coordinates. As with any projection system, it is useful to be able to say when you're referring to screen coordinates, and when you're talking about world coordinates. Screen coordinates are used to refer to individual pixels in your output image, while world coordinates are used to refer to where in your scene a given object is.</p>
-<h2>Two dimensional tiles</h2>
-<p>If you draw a flat square in this diametric projection (that is, a square on the x-y world plane), its screen width will be twice its screen height. This makes calculations for tiling such squares somewhat easier: the sprite has a height of <var>n</var>, and a width of 2<var>n</var>. When you offset the sprite to tile it in a grid, you offset it by a multiple of <var>n</var>.</p>
-<p>How do we tile these tiles, then? To move by one tile in the world x direction, we move it down by half of the tile's screen height, and to the right by half of the tile's screen width. This comes out to moving it by <var>n</var>/2 in the vertical direction, and <var>n</var> in the horizontal direction. To move one tile in the world y direction, it's the same story, except we move to the left instead of right. To move diagonally, we shift down by a full tile's height, <var>n</var>, in the vertical. <a href="#figure-2">Figure 2</a> shows a simple example.</p>
-<figure id="figure-2" class="figwide"><a href="_isometric-tiles.html/tiledtiles.png"><img src="_isometric-tiles.html/tiledtiles.png" alt="An illustration showing the offsets for tiling tile sprites."></a><figcaption>Figure 2: Tiling in two dimensions.</figcaption></figure><p>Applying these principles. We arrive at formulas for getting the screen coordinates from the world coordinates, seen in <a href="#listing-1">Listing 1</a>. The assumptions are that the tile dimensions are 1×1 in the world coordinates, and that the <i>0, 0</i> tile in world space is also at <i>0, 0</i> in screen space.</p>
-<figure id="listing-1" class="figwide">
-<p><var>screen_x</var> = ( <var>world_x</var> - <var>world_y</var> ) × <var>n</var></p>
-
-<p><var>screen_y</var> = ( <var>world_x</var> + <var>world_y</var> ) × <var>n</var>/2</p>
-<figcaption>Listing 1: The formulas for translating world coordinates to screen coordinates</figcaption>
-</figure><p>Of course, the fact that these screen coordinates have the <i>0, 0</i> tile as the origin means that we may have to figure out where to place the <i>0, 0</i> tile on the screen. The formulas can help here, too: figure out how many tiles we want to the left of the origin tile, and use the formula to figure out how many pixels will be needed to the left of the origin tile to fit everything.</p>
-<h2>Adding a dimension</h2>
-<p><cite>cubeglobe</cite> maps are three-dimensional—they represent cube blocks, instead of flat tiles. This means that we also need to figure out how to place tiles depending on their z-axis coordinate in the world space.</p>
-<p>The easiest way to think of cuboid tile sprites is to think of them as a flat tile with the z-axis component either below it or above it. In other words, take your existing flat tile and draw a cube, either on top of it, or below it. <cite>cubeglobe</cite>, in particular, aligns tiles by their tops, so that means its tiles are a flat tile with the cube below it.</p>
-<p>So, how much do we shift in the screen space to shift by one level in the world coordinates? To figure that out we must know the height of our sprite—let's call this <var>h</var>. Recall that the flat diametric tile has screen space dimensions of 2<var>n</var> by <var>n</var>. This remains true even as we move to representing cubes: the tile on top of the cube is still 2<var>n</var> by <var>n</var>. The pixel height we need to shift by is equal to the height of the sprite that remains after we take away the height of the tile on top: <var>h</var>-<var>n</var>.</p>
-<figure id="figure-3" class="figwide"><a href="_isometric-tiles.html/blockdimensions.png"><img src="_isometric-tiles.html/blockdimensions.png" alt="A block drawn in diametric projection, annotated with dimensions."></a><figcaption>Figure 3: The top and sides of a block, and their dimensions.</figcaption></figure><p>It's worth pointing out here that while it may be tempting to make the block sprite a square, it does not work very well. If the total height is 2<var>n</var>, then the amount we would shift for a new z-level would be <var>n</var>. We also shift by <var>n</var> for some situations when operating on the same z-level, so we end up with a situation where it is hard to tell if something is above or behind, as seen in <a href="figure-4">Figure 4</a>.</p>
-<figure id="figure-4" class="figwide"><a href="_isometric-tiles.html/blocksonblocks.png"><img src="_isometric-tiles.html/blocksonblocks.png" alt="Two different clumps of tiled blocks."></a><figcaption>Figure 4: The blocks on the left have a square sprite, and it is difficult to tell what is in front. The blocks on the right are a bit taller, and arranged the same as the ones on the left, but their layout is easier to see.</figcaption></figure><p>Correctly drawn cubes in this perspective are actually slightly taller than square. While a mathematically accurate projection is not required to make things look like cubes, having the sprite be rectangular does help in differentiating between the background and the foreground, visually.</p>
-<h2>Blocks upon blocks</h2>
-<p><cite>cubeglobe</cite> renders its landscapes by repeatedly drawing the blocks one-by-one, from the lowest level to the highest. This is obviously not the most efficient way to do this—a large number of blocks are going to be occluded by other blocks, and thus never seen on screen—but it is quite simple.</p>
-<p>Each level can be drawn row-first or column-first, starting from the lowest coordinates. The blocks with the lower coordinates are going to be behind the blocks with the higher coordinates, so we can simply draw them in the right order. Each level can then be layered on top of the previous one—the lower level will be occluded by the higher one.</p>
-<p><cite>cubeglobe</cite> does not employ any concurrency, although it would theoretically be possible to, for example, draw each layer separately and then combine them in order, afterwards. The overhead may not be worth it, though, and it would require some exploration in practice.</p>
-<h2>Conclusions</h2>
-<p>I wrote <cite>cubeglobe</cite> partly because I was wondering how hard it would be to draw isometric graphics like that, given no prior knowledge. Turns out it is not very hard, although it does require figuring out the formulas above. Fortunately, these sorts of graphics have a long history of use in video games, so it is not particularly hard to find useful resources.</p>
-<p>Despite a rather inefficient way of drawing things, <cite>cubeglobe</cite> is not incredibly slow. This was something of a pleasant surprise.</p>
-<p>Actually generating landscapes is an entirely separate problem, of course, and not covered here. With block-based landscapes like these, however, the internal representation can be fairly simple, which makes it easy to separate the rendering side from the generating side.</p>
-<h2>Further reading</h2>
-<ul>
-<li>"<a href="http://clintbellanger.net/articles/isometric_math/">Isometric Tiles Math</a>" by Clint Bellanger – Probably a far better explanation of how to tile tiles in two dimensions, along with some extra stuff for translating screen coordinates to world coordinates.</li>
-</ul>
-</div>
-  </article>
+This post is now at <a href="https://dee.underscore.world/blog/isometric-tiles.html" rel="canonical">https://dee.underscore.world/blog/isometric-tiles.html</a>. You should be redirected there after 5 seconds. 
 
   </main>
-  <footer id="sitefooter">
-    <strong>deeunderscore.github.io</strong> is authored by <span class="p-author h-card">D Anzorge</span>. The contents of this website are available under the <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>. <a href="dweb:/ipns/12D3KooWLcK76pgXHAPVmVfgGo4kpK9eqmhoiN3KTrSwSwidbcpd">IPFS copy</a>. All times are UTC.
-  </footer>
 </div>
 </body>
 </html>

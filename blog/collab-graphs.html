@@ -2,106 +2,16 @@
 <html lang="en-US">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../static/main.css?h=a1cf09c1">
-  <link rel="stylesheet" href="../static/pygments.css">
-  <title>Collaboration graphs and Git — deeunderscore.github.io</title>
-  <link rel="alternate" type="application/atom+xml" title="Blog" href="../blog/feed.xml">
+  <title>Collaboration graphs and Git — moved to dee.underscore.world</title>
+  <meta http-equiv="refresh" content="5; url=https://dee.underscore.world/blog/collab-graphs.html">
 </head>
 <body>
 <div id="wrapper">
-  <header id="banner">
-      <h1><a href="/">dee&#8203;underscore&#8203;.github&#8203;.io</a></h1>
-  </header>
-    <nav id="menu"><ul>
-        
-          <li><a href="../">Home</a></li>
-        
-          <li><a href="../blog/">Blog</a></li>
-        
-          <li><a href="../about/">About</a></li>
-        
-          <li><a href="../dmi">DMI viewer</a></li>
-        
-    </ul></nav>
-    <div id="movednotice"><h2>Notice</h2><p>This website has moved to <a href="https://dee.underscore.world" rel="me">dee.underscore.world</a>. This version remains here as an archive.</p></div>
   <main>
     
-  <article class="content fullarticle h-entry">
-    <header>
-      <h1 class="p-name">Collaboration graphs and Git</h1>
-      <div class="metamatter"><time class="dt-published" datetime="2018-09-19T15:08:00+00:00"> 19 September 2018, 15:08</time></div>
-    </header>
-    <div class="e-content"><p>A <a href="https://en.wikipedia.org/wiki/Collaboration_graph">collaboration graph</a>, as the name indicates, is a graph of people who have collaborated on projects of some kind. The vertices are individuals, and they are linked by an edge if they have worked together on the same project.</p>
-<p>A popular application of collaboration graphs is calculating somebody's <a href="https://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon#Bacon_numbers">Bacon number</a> or <a href="https://en.wikipedia.org/wiki/Erd%C5%91s_number">Erdős number</a>. In case of the Bacon number, the collaboration graph links actors who have been in a movie together. The number is equal to the number of edges between Kevin Bacon and a given actor. An actor who was in a movie with Kevin Bacon has a Bacon number of 1. An actor with the Bacon number of 2 is someone who was not in any movies with Kevin Bacon, but was in a movie with someone else, who in turn <em>was</em> in a movie with Bacon. The Erdős number is the same concept, except instead of movies, people are linked by co-authorship of academic papers.</p>
-<p>I have a lot of FOSS project Git repositories cloned on my computer. Some of them I have contributed to, but I also clone stuff to compile locally, or even to check out the source code. It occurred to me that using those repositories, I can build a small collaboration graph of FOSS contributors. This should not be too hard, since both libraries for pulling information out of Git repositories and libraries for building and analyzing graphs are readily available.</p>
-<h2>Histories of Git</h2>
-<p>When you set up Git on your computer you will (hopefully) input two things: your name, and your email address (<code>user.name</code> and <code>user.email</code>, respectively). Git adds these to every commit you make. Because of this, if you have a Git repository that was not cloned shallowly (that is, you have all the commits available locally), then you can find a list of all people who have contributed to it.</p>
-<p>Git is popular, so of course there is a library available for interacting with it from Python: the aptly-named <a href="https://github.com/gitpython-developers/GitPython">GitPython</a> library. It makes it fairly easy to process Git commit histories:</p>
-<div class="hll"><pre><span></span><span class="kn">from</span> <span class="nn">git</span> <span class="k">import</span> <span class="n">Repo</span>
-
-<span class="n">contributors</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
-<span class="n">repo</span> <span class="o">=</span> <span class="n">Repo</span><span class="p">(</span><span class="s1">&#39;/path/to/repo&#39;</span><span class="p">)</span>
-<span class="n">commits</span> <span class="o">=</span> <span class="n">repo</span><span class="o">.</span><span class="n">iter_commits</span><span class="p">()</span>
-
-<span class="k">for</span> <span class="n">commit</span> <span class="ow">in</span> <span class="n">commits</span><span class="p">:</span>
-    <span class="n">contributors</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">commit</span><span class="o">.</span><span class="n">author</span><span class="p">)</span>
-</pre></div>
-<p>With some parallelization to make things faster, we can process all the git directories we are interested in, and either load the data directly into a graph object, or perhaps save it in an SQLite database for easier loading later.</p>
-<p>Of course, it should be noted that a person can contribute under several name-email pairs. Sites like Github will generally identify people by their email address, and that is a relatively easy option. It is certainly possible that someone would have the same name and several different addresses under which they contributed, but that gets into more complicated territory, with possible false positives when trying to merge contributors.</p>
-<h2>Making a graph</h2>
-<p>After obtaining a set of contributors for a given project, we will want to add that information to a graph. Two most popular graph libraries for Python seem to be <a href="https://graph-tool.skewed.de/">graph-tool</a> and <a href="https://networkx.github.io/">NetworkX</a>.</p>
-<p>graph-tool focuses on performance—it uses C or C++ parts for handling the more computationally demanding tasks. NetworkX, on the other hand, is somewhat more flexible. Attaching metadata to edges or vertices is easier in NetworkX than in graph-tool, but drawing a good-looking graph with a lot of edges is faster if you use graph-tool, rather than NetworkX's matplotlib graphing capabilities. Both libraries are capable of dumping and loading graphs to and from a number of formats, so it is not very difficult to switch from one to the other.</p>
-<p>NetworkX is slightly easier to use in this case. Since it can use any hashable Python object as a vertex, we can use project paths and contributor emails to identify our vertices. Adding a vertex is idempotent—if we try to add the same object twice, we only end up with one vertex.</p>
-<p>Having obtained a set of contributors for each project earlier on, we can now easily create a graph, whether we are running a database query or just directly using the sets we assembled earlier.</p>
-<div class="hll"><pre><span></span><span class="n">graph</span> <span class="o">=</span> <span class="n">networkx</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
-
-<span class="c1"># pairs contains tuples of project path and contributor email, such</span>
-<span class="c1"># as (&#39;/path/to/repo&#39;, &#39;alice@example.com&#39;)</span>
-
-<span class="k">for</span> <span class="n">project</span><span class="p">,</span> <span class="n">contributor</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">:</span>
-    <span class="n">graph</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">project</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;project&#39;</span><span class="p">)</span>
-    <span class="n">graph</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">contributor</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;contributor&#39;</span><span class="p">)</span>
-
-    <span class="n">graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">project</span><span class="p">,</span> <span class="n">contributor</span><span class="p">)</span>
-</pre></div>
-<p>Note that both projects and contributors are vertices (which NetworkX calls <i>nodes</i>). We include extra metadata in the form of the <code>kind</code> field.</p>
-<h2>Finding paths</h2>
-<p>If we want to find a path between two vertices, NetworkX offers us an aptly named function: <code>shortest_path()</code>. Let's say we want to find the path between <code>alice@example.com</code> and <code>bob@example.com</code>:</p>
-<div class="hll"><pre><span></span><span class="n">networkx</span><span class="o">.</span><span class="n">shortest_path</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="s1">&#39;alice@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;bob@example.com&#39;</span><span class="p">)</span>
-</pre></div>
-<p>Provided there actually is a path between the two nodes, we will get something like this:</p>
-<div class="hll"><pre><span></span><span class="p">[</span><span class="s1">&#39;alice@example.com&#39;</span><span class="p">,</span>
- <span class="s1">&#39;/some/project&#39;</span><span class="p">,</span>
- <span class="s1">&#39;carol@example.com&#39;</span><span class="p">,</span>
- <span class="s1">&#39;/another/project&#39;</span><span class="p">,</span>
- <span class="s1">&#39;bob@example.com&#39;</span><span class="p">]</span>
-</pre></div>
-<p>As a human, you can tell that Bob is two hops away from Alice. Of course, you can also programmatically filter the resulting path to only show contributors:</p>
-<div class="hll"><pre><span></span><span class="n">path</span> <span class="o">=</span> <span class="n">networkx</span><span class="o">.</span><span class="n">shortest_path</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s1">&#39;alice@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;bob@example.com&#39;</span><span class="p">)</span>
-<span class="n">kind</span> <span class="o">=</span> <span class="n">networkx</span><span class="o">.</span><span class="n">get_node_attributes</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="s1">&#39;kind&#39;</span><span class="p">)</span>
-
-<span class="s1">&#39; — &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="n">kind</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;contributor&#39;</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
-</pre></div>
-<p>This will give you a string like this:</p>
-<div class="hll"><pre><span></span><span class="s1">&#39;alice@example.com — carol@example.com — bob@example.com&#39;</span>
-</pre></div>
-<p>On the other hand, you can also filter for the projects which connect the contributors. If you count these, you will get the degree of separation:</p>
-<div class="hll"><pre><span></span><span class="n">path</span> <span class="o">=</span> <span class="n">networkx</span><span class="o">.</span><span class="n">shortest_path</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s1">&#39;alice@example.com&#39;</span><span class="p">,</span> <span class="s1">&#39;bob@example.com&#39;</span><span class="p">)</span>
-<span class="n">kind</span> <span class="o">=</span> <span class="n">networkx</span><span class="o">.</span><span class="n">get_node_attributes</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="s1">&#39;kind&#39;</span><span class="p">)</span>
-
-<span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">path</span> <span class="k">if</span> <span class="n">kind</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;project&#39;</span><span class="p">)</span>
-</pre></div>
-<h2>Conclusions</h2>
-<p>After all this, I found out my Linus Torvalds Number is two—I have contributed to a project that someone who has contributed to Git also contributed to. Of course, there is more stuff you can do with with collaboration graphs like these—for an obvious example, you can draw them. The available Python libraries make it fairly easy to get started.</p>
-</div>
-  </article>
+This post is now at <a href="https://dee.underscore.world/blog/collab-graphs.html" rel="canonical">https://dee.underscore.world/blog/collab-graphs.html</a>. You should be redirected there after 5 seconds. 
 
   </main>
-  <footer id="sitefooter">
-    <strong>deeunderscore.github.io</strong> is authored by <span class="p-author h-card">D Anzorge</span>. The contents of this website are available under the <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>. <a href="dweb:/ipns/12D3KooWLcK76pgXHAPVmVfgGo4kpK9eqmhoiN3KTrSwSwidbcpd">IPFS copy</a>. All times are UTC.
-  </footer>
 </div>
 </body>
 </html>

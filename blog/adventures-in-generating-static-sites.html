@@ -2,89 +2,16 @@
 <html lang="en-US">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../static/main.css?h=a1cf09c1">
-  <link rel="stylesheet" href="../static/pygments.css">
-  <title>Adventures in generating static sites — deeunderscore.github.io</title>
-  <link rel="alternate" type="application/atom+xml" title="Blog" href="../blog/feed.xml">
+  <title>Adventures in generating static sites — moved to dee.underscore.world</title>
+  <meta http-equiv="refresh" content="5; url=https://dee.underscore.world/blog/adventures-in-generating-static-sites.html">
 </head>
 <body>
 <div id="wrapper">
-  <header id="banner">
-      <h1><a href="/">dee&#8203;underscore&#8203;.github&#8203;.io</a></h1>
-  </header>
-    <nav id="menu"><ul>
-        
-          <li><a href="../">Home</a></li>
-        
-          <li><a href="../blog/">Blog</a></li>
-        
-          <li><a href="../about/">About</a></li>
-        
-          <li><a href="../dmi">DMI viewer</a></li>
-        
-    </ul></nav>
-    <div id="movednotice"><h2>Notice</h2><p>This website has moved to <a href="https://dee.underscore.world" rel="me">dee.underscore.world</a>. This version remains here as an archive.</p></div>
   <main>
     
-  <article class="content fullarticle h-entry">
-    <header>
-      <h1 class="p-name">Adventures in generating static sites</h1>
-      <div class="metamatter"><time class="dt-published" datetime="2018-03-21T18:44:40+00:00"> 21 March 2018, 18:44</time></div>
-    </header>
-    <div class="e-content"><p>Static site generators seem fairly popular these days, and as a result there is a lot of them to pick from. The go-to place for a list is probably <a href="https://www.staticgen.com/">static-gen.com</a>, and that fairly long list does not even include generators not hosted on Github (of which there may or may not be some).</p>
-<p>This site is statically generated, and so in order to get here, I had to dive into the world of static site generators and emerge with one which suited my needs.</p>
-<h2>Blogs and not-blogs</h2>
-<p>A lot of static site generators out there are essentially static blog generators. This generally involves having a bunch of posts which can be sorted chronologically and displayed in sequence on the output pages. Sometimes, there are features like tags or categories, which allow identifying some subset of posts to display on a page dedicated to that particular tag or category. Pages are also often a feature—these are usually a special kind of a post which lives outside of the main list, and can be referenced in a navigational menu or something similar.</p>
-<p>Another group of static site generators is designed around providing a more generic framework for building static websites. These still separate content from templates, but instead of enforcing a set taxonomy allow the user to define their own. Blogs are still possible with this way of doing things, but require explaining to the software what a blog is. The upside is more possibilities in generating non-blog things.</p>
-<h2>Lektor</h2>
-<p><a href="https://www.getlektor.com/"><strong>Lektor</strong></a> is a static site generator from the latter category. Written in Python, it uses Jinja2 for templating, and has a plugin system for extending functionality.</p>
-<p>Lektor has a set of features common to static site generators of its ilk: it expects content in plain text files, tries to be smart about not re-generating already generated stuff, and offers a local server with dynamic reload for quickly testing your site. An unusual feature is its admin panel: when running the local server, Lektor also runs a nice UI which allows you to create, edit, and delete content files from within the browser—a feature common to dynamic content management systems, but usually not found in static generators.</p>
-<h2>How building sites with Lektor works</h2>
-<p>Lektor manages to strike a nice balance between flexibility and complexity. In order to build a website, one has to define some models, some templates, and then use them with some content.</p>
-<h3>Models</h3>
-<p>Defining models involves creating some ini files. These tell Lektor what fields a particular type of content should have—fields like <em>title</em>, <em>body</em>, or <em>publish date</em>. One can also do things like define default subtypes of children, or set pagination and sorting for said children. A trivial example:</p>
-<div class="hll"><pre><span></span><span class="k">[model]</span>
-<span class="na">name</span> <span class="o">=</span> <span class="s">Blogpost</span>
-
-<span class="k">[fields.title]</span>
-<span class="na">type</span> <span class="o">=</span> <span class="s">String</span>
-
-<span class="k">[fields.body]</span>
-<span class="na">type</span> <span class="o">=</span> <span class="s">String</span>
-</pre></div>
-<h3>Templates</h3>
-<p>Templates use <a href="http://jinja.pocoo.org/">Jinja2</a>. A template gets an object representing a content element; the fields of the object can be used in the template. A template generally goes with a model (or multiple models), so those are the fields that we know we can use. A template for the model above could be this:</p>
-<div class="hll"><pre><span></span><span class="x">&lt;article&gt;</span>
-<span class="x">&lt;h1&gt;</span><span class="cp">{{</span> <span class="nv">this.title</span> <span class="cp">}}</span><span class="x">&lt;/h2&gt;</span>
-<span class="cp">{{</span> <span class="nv">this.body</span> <span class="cp">}}</span><span class="x"></span>
-<span class="x">&lt;/article&gt;</span>
-</pre></div>
-<h3>Content</h3>
-<p>Finally, Lektor will need some content—entries which use a particular model and fill out its fields. This is where it gets a bit odd: while other, similar systems tend to use something like YAML or JSON prepended to the main content, Lektor uses fields separated by <code>---</code>:</p>
-<pre><code>title: Hello, world!
----
-body:
-Hello, world! This is my first blog post!
-</code></pre>
-<p>Lektor does not assume there is a default, main content field, and so the body field is just like any other the model has.</p>
-<h2>In practice</h2>
-<p>Lektor aims to be simple, without sacrificing flexibility. It is capable of doing fancier things, beyond the basics outlined above, but the basics themselves are, indeed, simple. This is one of the nicer things about Lektor: it is more powerful than the simpler blog generators, yet does not require too much setup and fiddling.</p>
-<p>There is some nice flexibility to Lektor. It has a plugin system to extend functionality, and the templating system itself is fairly powerful as well. The templates can also use the API that Lektor provides to, for example, query for arbitrary content. For a more structured approach, there is a <em>flow</em> mode, which allows gluing together blocks which use different models—essentially creating a page which incorporates arbitrary sub-pages with their own content and templates.</p>
-<p>There are some downsides to Lektor, though. For one, the admin UI does not seem to be geared towards managing a large amount of subpages, such that would be present in a long-running blog. The content folder also requires every subpage to be its own subdirectory, with a file named <code>contents.lr</code> inside for the actual content, which may be seen as a bit verbose. Additionally, the recommended way of automating running Sass seems to be to do so via a Webpack plugin, which is a bit of a heavyweight solution, especially considering the fact that I have no need to process any Javascript.</p>
-<p>Another complaint, which is likely to bother some people more than others, is the installation process for Lektor. The recommended way is the dreaded <code>curl | sh</code>, and installing Lektor to a Virtualenv via Pip is discouraged due to the way Lektor manages its own plugins.</p>
-<h2>Alternatives</h2>
-<p>Of note is also some other, similar software I looked at before settling on Lektor.</p>
-<p><a href="https://gohugo.io/">Hugo</a> is a fairly popular, non-blog oriented static site generator written in Go. It is more complex than Lektor, and claims to be fairly fast. Another interesting project is <a href="https://getstatik.com/">Statik</a>, which is even more build-your-own-model than Lektor, and puts ORM-like queries front and center (Lektor has something similar, but it essentially an extra feature and not the main way of doing things).</p>
-<h2>Conclusions</h2>
-<p>All in all, though, I was able to get going with Lektor with relative ease, and did not need to sift through too much documentation to figure out how to do some of the less standard things. In an area with a lot of choices available, it is a piece of software that managers to meet my particular requirements, and does so quite well.</p>
-</div>
-  </article>
+This post is now at <a href="https://dee.underscore.world/blog/adventures-in-generating-static-sites.html" rel="canonical">https://dee.underscore.world/blog/adventures-in-generating-static-sites.html</a>. You should be redirected there after 5 seconds. 
 
   </main>
-  <footer id="sitefooter">
-    <strong>deeunderscore.github.io</strong> is authored by <span class="p-author h-card">D Anzorge</span>. The contents of this website are available under the <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>. <a href="dweb:/ipns/12D3KooWLcK76pgXHAPVmVfgGo4kpK9eqmhoiN3KTrSwSwidbcpd">IPFS copy</a>. All times are UTC.
-  </footer>
 </div>
 </body>
 </html>

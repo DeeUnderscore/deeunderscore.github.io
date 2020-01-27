@@ -2,123 +2,16 @@
 <html lang="en-US">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../static/main.css?h=a1cf09c1">
-  <link rel="stylesheet" href="../static/pygments.css">
-  <title>Keeping things in Perkeep — deeunderscore.github.io</title>
-  <link rel="alternate" type="application/atom+xml" title="Blog" href="../blog/feed.xml">
+  <title>Keeping things in Perkeep — moved to dee.underscore.world</title>
+  <meta http-equiv="refresh" content="5; url=https://dee.underscore.world/blog/keeping-things-in-perkeep.html">
 </head>
 <body>
 <div id="wrapper">
-  <header id="banner">
-      <h1><a href="/">dee&#8203;underscore&#8203;.github&#8203;.io</a></h1>
-  </header>
-    <nav id="menu"><ul>
-        
-          <li><a href="../">Home</a></li>
-        
-          <li><a href="../blog/">Blog</a></li>
-        
-          <li><a href="../about/">About</a></li>
-        
-          <li><a href="../dmi">DMI viewer</a></li>
-        
-    </ul></nav>
-    <div id="movednotice"><h2>Notice</h2><p>This website has moved to <a href="https://dee.underscore.world" rel="me">dee.underscore.world</a>. This version remains here as an archive.</p></div>
   <main>
     
-  <article class="content fullarticle h-entry">
-    <header>
-      <h1 class="p-name">Keeping things in Perkeep</h1>
-      <div class="metamatter"><time class="dt-published" datetime="2018-05-18T16:44:44+00:00"> 18 May 2018, 16:44</time></div>
-    </header>
-    <div class="e-content"><p><a href="https://perkeep.org/"><strong>Perkeep</strong></a> (previously called Camlistore) introduces itself as "a set of open source formats, protocols, and software for modeling, storing, searching, sharing and synchronizing data in the post-PC era". Less vaguely, the purpose of Perkeep is chiefly to archive an individual's data, which can include both traditional files, as well as data that is not exactly files, like online posts.</p>
-<p>The Perkeep daemon comes with a bunch of tools and importers, but it does also expose HTTP APIs which can be used to interact with the storage system from outside. Since I use <a href="https://joinmastodon.org/">Mastodon</a>, I wanted to stick the contents of a Mastodon user data dump into Perkeep, using those APIs.</p>
-<p>This is an overview of how one would go about it. If you would like the concrete tool itself, check out <a href="https://github.com/DeeUnderscore/ap-perkeep-uploader"><strong>ap-perkeep-uploader</strong></a>.</p>
-<h2>Keeping permanently</h2>
-<p>In order to figure out how to stick our stuff in Perkeep, we need to figure out how Perkeep actually works. It starts with blobs.</p>
-<figure class="figbox"><a href="_keeping-things-in-perkeep.html/keepy.png"><img src="_keeping-things-in-perkeep.html/keepy-smallish.png" alt="A colorful, cartoonish bird"></a><figcaption>This is <a href="https://perkeep.org/keepy">Keepy</a>, the Perkeep parakeet. It is not an oddly-colored chicken, as I initially thought.</figcaption></figure><h3>Blobs</h3>
-<p>On the lowest level, Perkeep is a <strong>content-addressable storage</strong> system. There are several storage backends for the content-addressed blobs of immutable data, including several ways of storing them on a local disk (packed together or in separate files), as well as backends that upload blobs to cloud storage. Perkeep receives your data blob, hashes it, and then stores it under that hash (called <strong>blobref</strong>). You can subsequently get it back by providing the hash. All other functionality is built on top of this base.</p>
-<h3>Special blobs</h3>
-<p>Metadata for all those blobs floating around in the blobstore is provided in the shape of so-called <strong>schema blobs</strong>—blobs which contain plain text JSON objects with some specific fields. The Perkeep daemon comes with an indexer, which goes through all the blobs that go into the store, figures out which ones are relevant, and saves the data in its database. The index database is redundant with the data stored in blobs and can be recreated at any time.</p>
-<p>Using that index, Perkeep can provide a higher-level interface to the data put in it. Files, for example, are often stored over several blobs, and a file metadata blob tells us what blobs we need to fetch, and in what order to concatenate them together to get the original file back. The indexer will store that metadata, and if we ask it, it will fetch the file and glue it back together.</p>
-<p>Structured data is not limited to file metadata only, though—Perkeep can store arbitrary key-value pairs through permanodes. <strong>Permanodes</strong> and <strong>claims</strong> are Perkeep's answer to the problem of storing mutable data in an append-only data store. A permanode is essentially an anchor—its chief purpose is to provide an address in the form of its hash.</p>
-<p>Claims, on the other hand, are basically transactions: they are schema blobs which reference a permanode and say things like "set the field <code>foo</code> to value <code>bar</code>" or "delete field <code>foo</code>". The Perkeep indexer can then collect all the claims which reference a particular permanode, replay them in sequence, and figure out what attributes (key-value pairs) the permanode has. Of course, the permanode blob itself has not been changed—the indexer just created a virtual view of the permanode and its attributes.</p>
-<p>Note that permanodes and claims are <a href="https://perkeep.org/doc/json-signing/">cryptographically signed</a>. There is an API endpoint for doing the signing, but signing can also be done locally, by following the algorithm.</p>
-<h2>Scheming</h2>
-<p>Internal Perkeep importers generally work by creating a permanode for each item imported, and using the permanode's attributes to store the item's data. In practical terms, this means that something like the Twitter importer creates a permanode for every tweet, and the Atom/RSS importer creates a permanode for every feed item.</p>
-<p>At this point, we might want to glance at our ActivityStreams data, to figure out what we want to grab out of it. Here is a very simple example of one ActivityStreams activity:</p>
-<div class="hll"><pre><span></span><span class="p">{</span>
-    <span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;https://example.com/Alice/activities/1&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;Create&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;actor&quot;</span><span class="p">:</span> <span class="s2">&quot;https://example.com/Alice&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;published&quot;</span><span class="p">:</span> <span class="s2">&quot;2010-01-01T00:10:00Z&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;to&quot;</span><span class="p">:</span> <span class="p">[</span>
-        <span class="s2">&quot;https://www.w3.org/ns/activitystreams#Public&quot;</span>
-    <span class="p">],</span>
-    <span class="nt">&quot;object&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;https://example.com/Alice/notes/1&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;Note&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Hello, world!&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;to&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;https://www.w3.org/ns/activitystreams#Public&quot;</span>
-        <span class="p">]</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</pre></div>
-<p>Without getting too deep into how ActivityStreams/<a href="https://activitypub.rocks/">ActivityPub</a> works (a question that is otherwise interesting, if you wanted to build your own fediverse thing), we can see that we have an activity, as well as the object of that activity.</p>
-<p>So, to start, we make a permanode. This takes no data from our dump, just an arbitrary random string, and some signing data (faked here, longer in practice):</p>
-<div class="hll"><pre><span></span><span class="p">{</span>
-    <span class="nt">&quot;camliVersion&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> 
-    <span class="nt">&quot;camliType&quot;</span><span class="p">:</span> <span class="s2">&quot;permanode&quot;</span><span class="p">,</span> 
-    <span class="nt">&quot;random&quot;</span><span class="p">:</span> <span class="s2">&quot;IAmReallyRandom&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;camliSigner&quot;</span><span class="p">:</span> <span class="s2">&quot;sha224-aaabbbcccddd&quot;</span>
-<span class="p">,</span><span class="nt">&quot;camliSig&quot;</span><span class="p">:</span> <span class="s2">&quot;bm90aGluZyB0byBzZWUgaGVyZQo=&quot;</span><span class="p">}</span>
-</pre></div>
-<p>When we push the above permanode, it should be stored under the blobref <code>sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97</code>. We can then push some claim blobs to create attributes on that permanode:</p>
-<div class="hll"><pre><span></span><span class="p">{</span>
-    <span class="nt">&quot;camliVersion&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="nt">&quot;camliType&quot;</span><span class="p">:</span> <span class="s2">&quot;claim&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;camliSigner&quot;</span><span class="p">:</span> <span class="s2">&quot;sha224-aaabbbcccddd&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;claimDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-05-15T10:20:30Z&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;permaNode&quot;</span><span class="p">:</span> <span class="s2">&quot;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&quot;</span><span class="p">,</span>       
-    <span class="nt">&quot;claimType&quot;</span><span class="p">:</span> <span class="s2">&quot;set-attribute&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;attribute&quot;</span><span class="p">:</span> <span class="s2">&quot;activityId&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;https://example.com/Alice/activities/1&quot;</span>
-<span class="p">,</span><span class="nt">&quot;camliSig&quot;</span><span class="p">:</span> <span class="s2">&quot;8J+kt/CfpLfwn6S3Cg==&quot;</span><span class="p">}</span>
-</pre></div>
-<p>As you can see, we are <code>set</code>ting the attribute called <code>activityId</code> to the value <code>https://example.com/Alice/activities/1</code>. Note that we had to provide a date, since the indexer will replay the claims sequentially, and so needs to know which comes before which. We also have the permanode blobref, an attribute, an action (<code>set-attribute</code> here, but we could also do a <code>del-attribute</code>, for example), and a value.</p>
-<p>We now have two new blobs in the blobstore: one for the permanode, and one for the claim. The permanode blob remained the same as it was when we first put it there. However, the indexer will now see that the permanode <code>sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97</code> has an attribute <code>activityId</code>, and make it available for searching by that attribute. This ID is a useful thing to search by, since per ActivityPub it will be a globally unique identifier for this particular activity.</p>
-<p>We will need a claim for every attribute we want to set:</p>
-<div class="hll"><pre><span></span><span class="p">{</span>
-    <span class="nt">&quot;camliVersion&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="nt">&quot;camliType&quot;</span><span class="p">:</span> <span class="s2">&quot;claim&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;camliSigner&quot;</span><span class="p">:</span> <span class="s2">&quot;sha224-aaabbbcccddd&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;claimDate&quot;</span><span class="p">:</span> <span class="s2">&quot;2018-05-15T10:20:40Z&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;permaNode&quot;</span><span class="p">:</span> <span class="s2">&quot;sha224-a45054e92836a6f646cdbd31dd178af6578db6fed71ed65758081d97&quot;</span><span class="p">,</span>       
-    <span class="nt">&quot;claimType&quot;</span><span class="p">:</span> <span class="s2">&quot;set-attribute&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;attribute&quot;</span><span class="p">:</span> <span class="s2">&quot;content&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;Hello, world!&quot;</span>
-<span class="p">,</span><span class="nt">&quot;camliSig&quot;</span><span class="p">:</span> <span class="s2">&quot;c3RpbGwgbm90aGluZyB0byBzZWUK&quot;</span><span class="p">}</span>
-</pre></div>
-<p>...and so on, until we've slurped everything we wanted to slurp.</p>
-<p>For more complicated data, we can have attributes with values that are blobrefs of further data—either more permanodes, or things like file nodes. This allows creating a tree of permanodes, but also allows for representing things like image attachments by referencing a file schema blob.</p>
-<h2>Caveats</h2>
-<h3>Data modeling is tricky business</h3>
-<p>Of course, when saving your data for all eternity, it is somewhat important that you pick a suitable schema. With the ActivityStreams example, you <em>could</em> decide that you only want minimal metadata in the permanode, and that you are happy saving the rest as JSON in a separate file (that the indexer will not understand). On the other end of the spectrum, you may want to serialize the <em>entire</em> thing into a set of Perkeep permanodes, possibly slowing things down and increasing on-disk size, but at the same time making everything very friendly to the Perkeep indexer.</p>
-<p>This becomes more evident when we deal with things like ActivityStreams with their JSON-LD, which is meant to facilitate interlinking of structured data.  Of course, Perkeep is generally oriented more towards storing of personal archives instead of exchanging and linking data with others, so the schema has different requirements</p>
-<h3>Showing data</h3>
-<figure class="figbox"><a href="_keeping-things-in-perkeep.html/foldersforever.png"><img src="_keeping-things-in-perkeep.html/foldersforever-smallish.png" alt="Perkeep web UI, showing a bunch of unlabeled folders."></a><figcaption>The web UI has no idea what these are.</figcaption></figure><p>While we can shove all we want into Perkeep in the ways described above, the highest level parts of Perkeep will likely not understand our data. We can use standardized attributes for things like geolocation and time, which the indexer will understand. We can also issue specific search queries, based on fields we know our data has. However, the Perkeep web UI, only knows about the schema which the Perkeep importers use, and is not easily extensible.</p>
-<p>This is probably the major incentive for actually hacking on Perkeep proper, instead of creating solution which interact with it via the API. One has to dive into Perkeep's guts anyway, if one wants to their data presented fancily.</p>
-<h2>Forever is a long time</h2>
-<p>Personally, I have not been using Perkeep for a long time. This is unlike some of its developers, who have been using it for years. Nevertheless, it cannot hurt to use something designed to slurp and archive things that usually remain otherwise unslurepd and unarchived. And, should Perkeep turn out to be terrible in some way down the line, blob storage model is sufficiently simple to make migrating data out of it not seem like too daunting of a problem.</p>
-</div>
-  </article>
+This post is now at <a href="https://dee.underscore.world/blog/keeping-things-in-perkeep.html" rel="canonical">https://dee.underscore.world/blog/keeping-things-in-perkeep.html</a>. You should be redirected there after 5 seconds. 
 
   </main>
-  <footer id="sitefooter">
-    <strong>deeunderscore.github.io</strong> is authored by <span class="p-author h-card">D Anzorge</span>. The contents of this website are available under the <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>. <a href="dweb:/ipns/12D3KooWLcK76pgXHAPVmVfgGo4kpK9eqmhoiN3KTrSwSwidbcpd">IPFS copy</a>. All times are UTC.
-  </footer>
 </div>
 </body>
 </html>
